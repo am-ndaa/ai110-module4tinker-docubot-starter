@@ -64,50 +64,131 @@ class DocuBot:
         ignore punctuation if needed.
         """
         index = {}
-        # TODO: implement simple indexing
+        for filename, text in documents:
+            words = set(text.lower().split())
+            for word in words:
+                if word not in index:
+                    index[word] = []
+                index[word].append(filename)
         return index
 
     # -----------------------------------------------------------
     # Scoring and Retrieval (Phase 1)
     # -----------------------------------------------------------
 
+    def meaningful_query_words(self, query):
+        stopwords = {
+            "where",
+            "do",
+            "i",
+            "the",
+            "is",
+            "are",
+            "a",
+            "an",
+            "and",
+            "or",
+            "to",
+            "for",
+            "on",
+            "in",
+            "of",
+            "what",
+            "which",
+            "when",
+            "how",
+            "who",
+            "please",
+            "find",
+            "can",
+            "could",
+            "should",
+            "it",
+            "that",
+            "this",
+            "with",
+            "by",
+            "as",
+            "at",
+            "from",
+            "not",
+            "be",
+            "was",
+            "were",
+            "has",
+            "have",
+            "had",
+        }
+        words = []
+        for word in query.lower().split():
+            token = word.strip(".,!?\"'()[]{}:;")
+            if token and token not in stopwords:
+                words.append(token)
+        return words
+
+    def is_vague_query(self, query):
+        meaningful_words = self.meaningful_query_words(query)
+        return len(meaningful_words) < 2
+
     def score_document(self, query, text):
         """
-        TODO (Phase 1):
-        Return a simple relevance score for how well the text matches the query.
-
-        Suggested baseline:
-        - Convert query into lowercase words
-        - Count how many appear in the text
-        - Return the count as the score
+        Return a simple relevance score based on meaningful query terms.
         """
-        # TODO: implement scoring
-        return 0
+        query_words = self.meaningful_query_words(query)
+        if not query_words:
+            return 0
 
-    def retrieve(self, query, top_k=3):
+        text_lower = text.lower()
+        score = 0
+        for word in query_words:
+            score += text_lower.count(word)
+        print(f"SCORE: {score}")
+        return score
+
+    def retrieve(self, query, top_k=5):
         """
-        TODO (Phase 1):
         Use the index and scoring function to select top_k relevant document snippets.
 
         Return a list of (filename, text) sorted by score descending.
         """
-        results = []
-        # TODO: implement retrieval logic
-        return results[:top_k]
+        results = []  # Initialize list for results
+        for filename, text in self.documents:  # Loop through all documents
+            sections = []
+            current_section = []
+            for line in text.splitlines():
+                if line.strip():
+                    current_section.append(line)
+                else:
+                    if current_section:
+                        sections.append("\n".join(current_section).strip())
+                        current_section = []
+            if current_section:
+                sections.append("\n".join(current_section).strip())
+
+            for section in sections:
+                score = self.score_document(query, section)
+                if score > 0:  # Only include sections with at least one match
+                    results.append((score, filename, section))
+
+        results.sort(reverse=True)  # Sort by score descending
+        return [(filename, section) for score, filename, section in results[:top_k]]
 
     # -----------------------------------------------------------
     # Answering Modes
     # -----------------------------------------------------------
 
-    def answer_retrieval_only(self, query, top_k=3):
+    def answer_retrieval_only(self, query, top_k=5):
         """
         Phase 1 retrieval only mode.
         Returns raw snippets and filenames with no LLM involved.
         """
+        if self.is_vague_query(query):
+            return "I cannot answer that question based on these docs."
+
         snippets = self.retrieve(query, top_k=top_k)
 
         if not snippets:
-            return "I do not know based on these docs."
+            return "I cannot answer that question based on these docs."
 
         formatted = []
         for filename, text in snippets:
@@ -121,6 +202,9 @@ class DocuBot:
         Uses student retrieval to select snippets, then asks Gemini
         to generate an answer using only those snippets.
         """
+        if self.is_vague_query(query):
+            return "I cannot answer that question based on these docs."
+
         if self.llm_client is None:
             raise RuntimeError(
                 "RAG mode requires an LLM client. Provide a GeminiClient instance."
@@ -129,7 +213,7 @@ class DocuBot:
         snippets = self.retrieve(query, top_k=top_k)
 
         if not snippets:
-            return "I do not know based on these docs."
+            return "I cannot answer that question based on these docs."
 
         return self.llm_client.answer_from_snippets(query, snippets)
 
