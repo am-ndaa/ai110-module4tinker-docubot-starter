@@ -1,3 +1,7 @@
+# Summary
+
+The core concept students need to understand is how RAG systems are implemented and why they are used. I think students might struggle with the setup. Installing the requirements might be tricky if they are running it from the wrong directry and don't realize. Also, generating the API key may be confusing if they have never worked with APIs before. Copilot was very helpful for this lab and it didn't mislead me anywhere. One way I would help a student without giving the answer is if they are confused on what the functions we implemented are doing. I would ask the student what their current understanding is or ask them to recap what they have completed so far so I can understand where they're at. 
+
 # DocuBot
 
 DocuBot is a small documentation assistant that helps answer developer questions about a codebase.  
